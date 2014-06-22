@@ -7,11 +7,7 @@ import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.PosixParser;
+import org.apache.commons.cli.*;
 
 public class NetCat
 {
@@ -57,19 +53,38 @@ public class NetCat
         transferStreams( socket );
     }
 
-    private static void transferStreams( Socket socket ) throws IOException,
+    private static void transferStreams( final Socket socket ) throws IOException,
             InterruptedException
     {
+        // Shutdown socket when this program is terminated
+        Runtime.getRuntime().addShutdownHook( new Thread()
+        {
+            public void run()
+            {
+                try {
+                    socket.shutdownOutput();
+                } catch( Exception e ) {
+                    e.printStackTrace();
+                }
+            }
+        } );
+
         InputStream input1 = System.in;
         OutputStream output1 = socket.getOutputStream();
         InputStream input2 = socket.getInputStream();
         PrintStream output2 = System.out;
+
         Thread thread1 = new Thread( new StreamTransferer( input1, output1 ) );
+        thread1.setName( "Thread1: Local-Remote" );
+
         Thread thread2 = new Thread( new StreamTransferer( input2, output2 ) );
+        thread2.setName( "Thread2: Remote-Local" );
+
         thread1.start();
         thread2.start();
-        thread1.join();
-        socket.shutdownOutput();
+
+        // Exit when other side is terminated
         thread2.join();
+        System.exit( 0 );
     }
 }
