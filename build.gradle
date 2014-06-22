@@ -1,0 +1,41 @@
+apply plugin: 'java'
+apply plugin: 'application'
+
+sourceCompatibility = 1.7
+version = '1.0'
+
+repositories {
+    mavenCentral()
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+
+dependencies {
+    compile 'commons-cli:commons-cli:1.2'
+    testCompile 'junit::junit:4.11'
+}
+
+mainClassName = 'netcat.NetCat'
+
+// After executing "jar" task one can run program like this:
+// java -jar build/libs/java-netcat-{version}.jar -p 9999 -l        - listen
+// java -jar build/libs/java-netcat-{version}.jar -p 9999 127.0.0.1 - connect
+jar {
+    from configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    manifest.attributes("Main-Class": mainClassName)
+}
+
+// Using "run" task one can run program like this:
+// gradle run -PappArgs="['-p','9999','-l']"        - listen
+// gradle run -PappArgs="['-p','9999','127.0.0.1']" - connect
+run {
+    if(project.hasProperty('appArgs')) {
+        args Eval.me(appArgs)
+    }
+}
