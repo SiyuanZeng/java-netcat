@@ -1,4 +1,4 @@
-package netcat;
+package com.github.dddpaul.netcat;
 
 import java.io.*;
 import java.net.InetSocketAddress;
