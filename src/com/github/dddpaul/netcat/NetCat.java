@@ -1,5 +1,10 @@
 package com.github.dddpaul.netcat;
 
+import org.kohsuke.args4j.Argument;
+import org.kohsuke.args4j.CmdLineException;
+import org.kohsuke.args4j.CmdLineParser;
+import org.kohsuke.args4j.Option;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -9,36 +14,37 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.channels.DatagramChannel;
 
-import org.apache.commons.cli.*;
-
 public class NetCat {
+
+    static class Options {
+        @Option(name = "-l", usage = "Listen mode, default false")
+        public boolean listen = false;
+
+        @Option(name = "-u", usage = "UDP instead TCP, default false")
+        public boolean udp = false;
+
+        @Option(name = "-p", usage = "Port number, default 9999")
+        public int port = 9999;
+
+        @Argument(usage = "Host, default 127.0.0.1", metaVar = "host")
+        public String host = "127.0.0.1";
+    }
+
     public static void main(String[] args) throws Exception {
-        CommandLineParser parser = new PosixParser();
+        Options opt = new Options();
+        CmdLineParser parser = new CmdLineParser(opt);
+        try {
+            parser.parseArgument(args);
+        } catch (CmdLineException e) {
+            System.err.println(e.getMessage());
+            parser.printUsage(System.err);
+            System.exit(1);
+        }
 
-        Options options = new Options();
-        options.addOption("l", "listen", false, "listen mode");
-        options.addOption("p", "port", true, "port number");
-        options.addOption("u", "udp", false, "UDP instead TCP");
-
-        CommandLine line = parser.parse(options, args);
-
-        if (line.hasOption('l')) {
-            if (line.hasOption('p')) {
-                int port = Integer.parseInt(line.getOptionValue('p'));
-                if (line.hasOption('u')) {
-                    listenUdp(port);
-                } else {
-                    listen(port);
-                }
-            }
+        if (opt.listen) {
+            listen(opt.udp, opt.port);
         } else {
-            if (line.hasOption('p')) {
-                int port = Integer.parseInt(line.getOptionValue('p'));
-                connect(line.getArgs()[0], port);
-            } else {
-                HelpFormatter formatter = new HelpFormatter();
-                formatter.printHelp("netcat [OPTIONS] <HOST>", options);
-            }
+            connect(opt.host, opt.port);
         }
     }
 
@@ -48,20 +54,27 @@ public class NetCat {
         transferStreams(socket);
     }
 
-    private static void listen(int port) throws Exception {
-        System.err.println("Listening at TCP:" + port);
-        ServerSocket serverSocket = new ServerSocket(port);
-        Socket socket = serverSocket.accept();
-        System.err.println("Accepted");
-        transferStreams(socket);
+    private static void listen(boolean udp, int port) throws Exception {
+        System.err.println(String.format("Listening at %s:%d", udp ? "UDP" : "TCP", port));
+        if (udp) {
+            listenUdp(port);
+        } else {
+            listenTcp(port);
+        }
     }
 
-    private static void listenUdp(int port) throws Exception {
-        System.err.println("Listening at UDP:" + port);
+    private static void listenTcp(int port) throws Exception {
         DatagramChannel channel = DatagramChannel.open();
         channel.socket().bind(new InetSocketAddress(port));
         channel.configureBlocking(true);
         transferDatagrams(channel);
+    }
+
+    private static void listenUdp(int port) throws Exception {
+        ServerSocket serverSocket = new ServerSocket(port);
+        Socket socket = serverSocket.accept();
+        System.err.println("Accepted");
+        transferStreams(socket);
     }
 
 
