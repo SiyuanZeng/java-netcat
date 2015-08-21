@@ -1,33 +1,29 @@
 package com.github.dddpaul.netcat;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PrintWriter;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.concurrent.Callable;
 
 public class StreamTransferer implements Callable<Long> {
-    private InputStream input;
-    private OutputStream output;
+    private BufferedInputStream input;
+    private BufferedOutputStream output;
 
     public StreamTransferer(InputStream input, OutputStream output) {
-        this.input = input;
-        this.output = output;
+        this.input = new BufferedInputStream(input);
+        this.output = new BufferedOutputStream(output);
     }
 
     @Override
     public Long call() {
         long total = 0;
+        ByteBuffer buf = ByteBuffer.allocate(NetCat.BUFFER_LIMIT);
         try {
-            PrintWriter writer = new PrintWriter(output);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
-            String line;
-            while ((line = reader.readLine()) != null) {
-                total += line.length();
-                writer.println(line);
-                writer.flush();
+            int bytes;
+            while ((bytes = input.read(buf.array())) != -1) {
+                output.write(buf.array(), 0, bytes);
+                output.flush();
+                total += bytes;
+                buf.clear();
             }
         } catch (IOException e) {
             e.printStackTrace();

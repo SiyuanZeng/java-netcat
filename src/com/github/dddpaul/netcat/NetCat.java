@@ -20,12 +20,6 @@ public class NetCat {
     // Ready to handle full-size UDP datagram or TCP segment in one step
     public static int BUFFER_LIMIT = 2 << 16 - 1;
 
-    // Ready to get full-size UDP datagram or TCP segment in one step
-    public static int RECEIVE_BUFFER_LIMIT = 2 << 16 - 1;
-
-    // Ethernet-safe buffer limit
-    public static int SEND_BUFFER_LIMIT = 1400;
-
     private static ExecutorService executor = Executors.newFixedThreadPool(2);
 
     static class Options {
@@ -123,5 +117,6 @@ public class NetCat {
         // Wait till other side is terminated
         long bytesReceived = future.get();
         System.err.println("bytesReceived = " + bytesReceived);
+        System.exit(0);
     }
 }
