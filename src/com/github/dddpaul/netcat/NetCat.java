@@ -6,15 +6,27 @@ import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PrintStream;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class NetCat {
+
+    // Ready to handle full-size UDP datagram or TCP segment in one step
+    public static int BUFFER_LIMIT = 2 << 16 - 1;
+
+    // Ready to get full-size UDP datagram or TCP segment in one step
+    public static int RECEIVE_BUFFER_LIMIT = 2 << 16 - 1;
+
+    // Ethernet-safe buffer limit
+    public static int SEND_BUFFER_LIMIT = 1400;
+
+    private static ExecutorService executor = Executors.newFixedThreadPool(2);
 
     static class Options {
         @Option(name = "-l", usage = "Listen mode, default false")
@@ -50,8 +62,9 @@ public class NetCat {
 
     private static void connect(String host, int port) throws Exception {
         System.err.println("Connecting to " + host + " port " + port);
-        final Socket socket = new Socket(host, port);
-        transferStreams(socket);
+        SocketChannel channel = SocketChannel.open();
+        channel.connect(new InetSocketAddress(host, port));
+        transferStreams(channel);
     }
 
     private static void listen(boolean udp, int port) throws Exception {
@@ -63,67 +76,52 @@ public class NetCat {
         }
     }
 
-    private static void listenTcp(int port) throws Exception {
+    private static void listenUdp(int port) throws Exception {
         DatagramChannel channel = DatagramChannel.open();
         channel.socket().bind(new InetSocketAddress(port));
         channel.configureBlocking(true);
         transferDatagrams(channel);
     }
 
-    private static void listenUdp(int port) throws Exception {
-        ServerSocket serverSocket = new ServerSocket(port);
-        Socket socket = serverSocket.accept();
-        System.err.println("Accepted");
-        transferStreams(socket);
+    private static void listenTcp(int port) throws Exception {
+        ServerSocketChannel serverChannel = ServerSocketChannel.open();
+        serverChannel.socket().bind(new InetSocketAddress(port));
+        serverChannel.configureBlocking(true);
+        SocketChannel channel = serverChannel.accept();
+        InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
+        System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress().getHostAddress(), remoteAddress.getPort()));
+        transferStreams(channel);
     }
 
 
-    private static void transferStreams(final Socket socket) throws IOException, InterruptedException {
+    private static void transferStreams(final SocketChannel channel) throws IOException, InterruptedException, ExecutionException {
         // Shutdown socket when this program is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 try {
-                    socket.shutdownOutput();
+                    channel.shutdownOutput();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         });
 
-        InputStream input1 = System.in;
-        OutputStream output1 = socket.getOutputStream();
-        InputStream input2 = socket.getInputStream();
-        PrintStream output2 = System.out;
+        executor.submit(new StreamTransferer(System.in, channel.socket().getOutputStream()));
+        Future<Long> future = executor.submit(new StreamTransferer(channel.socket().getInputStream(), System.out));
 
-        Thread thread1 = new Thread(new StreamTransferer(input1, output1));
-        thread1.setName("Thread1: Local-Remote");
-
-        Thread thread2 = new Thread(new StreamTransferer(input2, output2));
-        thread2.setName("Thread2: Remote-Local");
-
-        thread1.start();
-        thread2.start();
-
-        // Exit when other side is terminated
-        thread2.join();
+        // Wait till other side is terminated
+        long bytesReceived = future.get();
+        System.err.println("bytesReceived = " + bytesReceived);
         System.exit(0);
     }
 
-    private static void transferDatagrams(final DatagramChannel channel) throws IOException, InterruptedException {
-        InputStream input = System.in;
-        PrintStream output = System.out;
+    private static void transferDatagrams(final DatagramChannel channel) throws IOException, InterruptedException, ExecutionException {
 
-        Thread thread1 = new Thread(new DatagramTransferer(input, channel));
-        thread1.setName("Thread1: Local-Remote");
+        executor.submit(new DatagramTransferer(System.in, channel));
+        Future<Long> future = executor.submit(new DatagramTransferer(channel, System.out));
 
-        Thread thread2 = new Thread(new DatagramTransferer(channel, output));
-        thread2.setName("Thread2: Remote-Local");
-
-        thread1.start();
-        thread2.start();
-
-        // Exit when other side is terminated
-        thread2.join();
-        System.exit(0);
+        // Wait till other side is terminated
+        long bytesReceived = future.get();
+        System.err.println("bytesReceived = " + bytesReceived);
     }
 }

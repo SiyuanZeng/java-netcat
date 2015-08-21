@@ -4,14 +4,9 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.util.concurrent.Callable;
 
-public class DatagramTransferer implements Runnable {
-
-    // Ready to get full-size UDP datagram or TCP segment in one step
-    public static int RECEIVE_BUFFER_LIMIT = 2 << 16 - 1;
-
-    // Ethernet-safe buffer limit
-    public static int SEND_BUFFER_LIMIT = 1400;
+public class DatagramTransferer implements Callable<Long> {
 
     private static InetSocketAddress remoteAddress;
 
@@ -30,19 +25,21 @@ public class DatagramTransferer implements Runnable {
     }
 
     @Override
-    public void run() {
-        ByteBuffer buf = ByteBuffer.allocate(input != null ? SEND_BUFFER_LIMIT : RECEIVE_BUFFER_LIMIT);
+    public Long call() {
+        long total = 0;
+        ByteBuffer buf = ByteBuffer.allocate(input != null ? NetCat.SEND_BUFFER_LIMIT : NetCat.RECEIVE_BUFFER_LIMIT);
         try {
             while (true) {
                 if (input != null) {
-                    send(buf);
+                    total += send(buf);
                 } else {
-                    receive(buf);
+                    total += receive(buf);
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return total;
     }
 
     private int send(ByteBuffer buf) throws IOException {

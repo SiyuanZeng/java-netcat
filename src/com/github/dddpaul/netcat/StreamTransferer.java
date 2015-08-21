@@ -6,8 +6,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.util.concurrent.Callable;
 
-public class StreamTransferer implements Runnable {
+public class StreamTransferer implements Callable<Long> {
     private InputStream input;
     private OutputStream output;
 
@@ -17,17 +18,20 @@ public class StreamTransferer implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Long call() {
+        long total = 0;
         try {
             PrintWriter writer = new PrintWriter(output);
             BufferedReader reader = new BufferedReader(new InputStreamReader(input));
             String line;
             while ((line = reader.readLine()) != null) {
+                total += line.length();
                 writer.println(line);
                 writer.flush();
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
+        return total;
     }
 }
