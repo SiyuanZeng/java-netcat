@@ -32,7 +32,9 @@ public class DatagramTransferer implements Callable<Long> {
         ByteBuffer buf = ByteBuffer.allocate(BUFFER_LIMIT);
         try {
             if (input != null) {
-                total = send(buf);
+                if (remoteAddress != null) {
+                    total = send(buf);
+                }
             } else {
                 total = receive(buf);
             }
