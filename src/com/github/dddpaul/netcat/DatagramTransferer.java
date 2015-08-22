@@ -6,6 +6,8 @@ import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.util.concurrent.Callable;
 
+import static com.github.dddpaul.netcat.NetCat.*;
+
 public class DatagramTransferer implements Callable<Long> {
     private static final String DISCONNECT_SEQUENCE = "~.";
     private static InetSocketAddress remoteAddress;
@@ -15,7 +17,7 @@ public class DatagramTransferer implements Callable<Long> {
     private DatagramChannel channel;
 
     public DatagramTransferer(InputStream input, DatagramChannel channel) {
-        this.input = new BufferedInputStream(input);
+        this.input = new BufferedInputStream(input, BUFFER_LIMIT);
         this.channel = channel;
     }
 
@@ -27,7 +29,7 @@ public class DatagramTransferer implements Callable<Long> {
     @Override
     public Long call() {
         long total = 0;
-        ByteBuffer buf = ByteBuffer.allocate(NetCat.BUFFER_LIMIT);
+        ByteBuffer buf = ByteBuffer.allocate(BUFFER_LIMIT);
         try {
             if (input != null) {
                 total = send(buf);
