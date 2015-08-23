@@ -4,7 +4,9 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 
@@ -12,40 +14,43 @@ import static com.github.dddpaul.netcat.NetCat.BUFFER_LIMIT;
 
 public class DatagramReceiver implements Callable<Long> {
 
-    private static final String DISCONNECT_SEQUENCE = "~.";
-
-    private BufferedOutputStream output;
-    private DatagramChannel channel;
+    private WritableByteChannel output;
+    private DatagramChannel input;
     private BlockingQueue<SocketAddress> queue;
 
-    public DatagramReceiver(DatagramChannel channel, OutputStream output, BlockingQueue<SocketAddress> queue) {
-        this.channel = channel;
-        this.output = new BufferedOutputStream(output);
+    public DatagramReceiver(DatagramChannel input, OutputStream output, BlockingQueue<SocketAddress> queue) {
+        this.input = input;
+        this.output = Channels.newChannel(output);
         this.queue = queue;
     }
 
     @Override
     public Long call() {
         long total = 0;
-        ByteBuffer buf = ByteBuffer.allocate(BUFFER_LIMIT);
+        ByteBuffer buf = ByteBuffer.allocateDirect(BUFFER_LIMIT);
         try {
-            InetSocketAddress remoteAddress = (InetSocketAddress) channel.receive(buf);
+            InetSocketAddress remoteAddress = (InetSocketAddress) input.receive(buf);
+            total = write(buf);
             System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress(), remoteAddress.getPort()));
-            total = buf.position();
-            channel.connect(remoteAddress);
+            input.connect(remoteAddress);
             queue.put(remoteAddress);
-            while (channel.isConnected()) {
-                output.write(buf.array(), 0, buf.position());
-                output.flush();
-                buf.clear();
-                total += channel.read(buf);
-                if (DISCONNECT_SEQUENCE.equals(new String(buf.array(), 0, buf.position()).trim())) {
-                    break;
-                }
+            while ((input.read(buf)) != -1) {
+                total += write(buf);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
         return total;
+    }
+
+    private int write(ByteBuffer buf) throws IOException {
+        buf.flip();
+        int bytes = output.write(buf);
+        if (buf.hasRemaining()) {
+            buf.compact();
+        } else {
+            buf.clear();
+        }
+        return bytes;
     }
 }
