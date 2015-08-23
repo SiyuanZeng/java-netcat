@@ -108,7 +108,7 @@ public class NetCat {
     }
 
     private static void transferDatagrams(final DatagramChannel channel) throws InterruptedException, ExecutionException {
-        BlockingQueue<SocketAddress> queue = new LinkedBlockingQueue<>();
+        BlockingQueue<SocketAddress> queue = new ArrayBlockingQueue<>(1);
         Future<Long> future = executor.submit(new DatagramReceiver(channel, System.out, queue));
 
         // Start sender after remote address will be determined
