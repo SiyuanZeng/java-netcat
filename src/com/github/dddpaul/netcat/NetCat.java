@@ -7,13 +7,11 @@ import org.kohsuke.args4j.Option;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 public class NetCat {
 
@@ -88,7 +86,7 @@ public class NetCat {
     }
 
 
-    private static void transferStreams(final SocketChannel channel) throws IOException, InterruptedException, ExecutionException {
+    private static void transferStreams(final SocketChannel channel) throws IOException, ExecutionException, InterruptedException {
         // Shutdown socket when this program is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
@@ -109,10 +107,13 @@ public class NetCat {
         System.exit(0);
     }
 
-    private static void transferDatagrams(final DatagramChannel channel) throws IOException, InterruptedException, ExecutionException {
+    private static void transferDatagrams(final DatagramChannel channel) throws InterruptedException, ExecutionException {
+        BlockingQueue<SocketAddress> queue = new LinkedBlockingQueue<>();
+        Future<Long> future = executor.submit(new DatagramReceiver(channel, System.out, queue));
 
-        executor.submit(new DatagramTransferer(System.in, channel));
-        Future<Long> future = executor.submit(new DatagramTransferer(channel, System.out));
+        // Start sender after remote address will be determined
+        SocketAddress remoteAddress = queue.take();
+        executor.submit(new DatagramSender(System.in, channel, remoteAddress));
 
         // Wait till other side is terminated
         long bytesReceived = future.get();
