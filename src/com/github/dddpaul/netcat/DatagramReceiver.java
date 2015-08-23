@@ -31,7 +31,7 @@ public class DatagramReceiver implements Callable<Long> {
         try {
             InetSocketAddress remoteAddress = (InetSocketAddress) channel.receive(buf);
             System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress(), remoteAddress.getPort()));
-            total = buf.position() - 1;
+            total = buf.position();
             channel.connect(remoteAddress);
             queue.put(remoteAddress);
             while (channel.isConnected()) {
