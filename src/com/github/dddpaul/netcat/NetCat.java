@@ -121,6 +121,9 @@ public class NetCat {
         return executor.submit(new DatagramReceiver(channel, opt.output, null));
     }
 
+    /**
+     * @return Receiver future
+     */
     private Future<Long> listenTcp() throws Exception {
         ServerSocketChannel serverChannel = ServerSocketChannel.open();
         serverChannel.socket().bind(new InetSocketAddress(opt.port));
@@ -131,12 +134,18 @@ public class NetCat {
         return transferStreams(channel);
     }
 
+    /**
+     * @return Receiver future
+     */
     private Future<Long> connectTcp() throws Exception {
         SocketChannel channel = SocketChannel.open();
         channel.connect(new InetSocketAddress(opt.host, opt.port));
         return transferStreams(channel);
     }
 
+    /**
+     * @return Receiver future
+     */
     private Future<Long> transferStreams(final SocketChannel channel) throws IOException, ExecutionException, InterruptedException {
         // Shutdown socket when this program is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
