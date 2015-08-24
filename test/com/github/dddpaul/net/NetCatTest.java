@@ -8,6 +8,7 @@ import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -58,18 +59,15 @@ public class NetCatTest extends Assert {
     @Test
     public void testTcp() throws Exception {
         listener = new NetCat(new NetCat.Options(true, false, HOST, PORT, input1, output1));
-        new Thread(Unchecked.runnable(listener::start)).start();
+        Executors.newSingleThreadExecutor().submit(listener::start);
         Thread.sleep(100);
 
         connector = new NetCat(new NetCat.Options(false, false, HOST, PORT, input2, output2));
         Future<Long> future = connector.start();
+        long receivedFromListener = future.get();
 
-        // Wait till other side is terminated
-        long bytesReceived = 0;
-        future.get();
-        assertThat("TCP receiver must be terminated by future.get()", bytesReceived, is(0L));
+        assertThat(receivedFromListener, is((long) INPUT1.getBytes().length));
         assertEquals("Connector must receive input from listener", INPUT1, output2.toString());
         assertEquals("Listener must receive input from connector", INPUT2, output1.toString());
     }
-
 }

@@ -32,6 +32,7 @@ public class StreamSender implements Callable<Long> {
                     buf.clear();
                 }
             }
+            output.shutdownOutput();
         } catch (IOException e) {
             e.printStackTrace();
         }
