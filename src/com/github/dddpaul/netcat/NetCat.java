@@ -44,23 +44,17 @@ public class NetCat {
 
         public InputStream input = System.in;
         public OutputStream output = System.out;
-        public int timeout;
 
         public Options() {
         }
 
-        public Options(boolean listen, boolean udp, String host, int port, InputStream input, OutputStream output, int timeout) {
+        public Options(boolean listen, boolean udp, String host, int port, InputStream input, OutputStream output) {
             this.listen = listen;
             this.udp = udp;
             this.port = port;
             this.host = host;
             this.input = input;
             this.output = output;
-            this.timeout = timeout;
-        }
-
-        public Options(boolean listen, boolean udp, String host, int port, InputStream input, OutputStream output) {
-            this(listen, udp, host, port, input, output, 0);
         }
     }
 
@@ -75,43 +69,7 @@ public class NetCat {
             System.exit(1);
         }
 
-        new NetCat(opt).run();
-    }
-
-    private NetCat run() throws Exception {
-        if (opt.listen) {
-            listen();
-        } else {
-            connect();
-        }
-        return this;
-    }
-
-    public void connect() throws Exception {
-        System.err.println(String.format("Connecting to [%s:%d]", opt.host, opt.port));
-        if (opt.udp) {
-            connectUdp();
-        } else {
-            connectTcp();
-        }
-    }
-
-    public void listen() throws Exception {
-        System.err.println(String.format("Listening at %s:%d", opt.udp ? "UDP" : "TCP", opt.port));
-        if (opt.udp) {
-            listenUdp();
-        } else {
-            listenTcp();
-        }
-    }
-
-    private void connectUdp() throws Exception {
-        DatagramChannel channel = DatagramChannel.open();
-        SocketAddress remoteAddress = new InetSocketAddress(opt.host, opt.port);
-        channel.connect(remoteAddress);
-
-        executor.submit(new DatagramSender(opt.input, channel, remoteAddress, opt.timeout));
-        Future<Long> future = executor.submit(new DatagramReceiver(channel, opt.output, null));
+        Future<Long> future = new NetCat(opt).start();
 
         // Wait till other side is terminated
         long bytesReceived = future.get();
@@ -119,13 +77,24 @@ public class NetCat {
         System.exit(0);
     }
 
-    private void connectTcp() throws Exception {
-        SocketChannel channel = SocketChannel.open();
-        channel.connect(new InetSocketAddress(opt.host, opt.port));
-        transferStreams(channel);
+    public Future<Long> start() throws Exception {
+        return opt.listen ? listen() : connect();
     }
 
-    private void listenUdp() throws Exception {
+    private Future<Long> listen() throws Exception {
+        System.err.println(String.format("Listening at %s:%d", opt.udp ? "UDP" : "TCP", opt.port));
+        return opt.udp ? listenUdp() : listenTcp();
+    }
+
+    private Future<Long> connect() throws Exception {
+        System.err.println(String.format("Connecting to [%s:%d]", opt.host, opt.port));
+        return opt.udp ? connectUdp() : connectTcp();
+    }
+
+    /**
+     * @return Receiver future
+     */
+    private Future<Long> listenUdp() throws Exception {
         DatagramChannel channel = DatagramChannel.open();
         channel.socket().bind(new InetSocketAddress(opt.port));
         channel.configureBlocking(true);
@@ -135,25 +104,40 @@ public class NetCat {
 
         // Start sender after remote address will be determined
         SocketAddress remoteAddress = queue.take();
-        executor.submit(new DatagramSender(opt.input, channel, remoteAddress, opt.timeout));
+        executor.submit(new DatagramSender(opt.input, channel, remoteAddress));
 
-        // Wait till other side is terminated
-        long bytesReceived = future.get();
-        System.err.println("bytesReceived = " + bytesReceived);
-        System.exit(0);
+        return future;
     }
 
-    private void listenTcp() throws Exception {
+    /**
+     * @return Receiver future
+     */
+    private Future<Long> connectUdp() throws Exception {
+        DatagramChannel channel = DatagramChannel.open();
+        SocketAddress remoteAddress = new InetSocketAddress(opt.host, opt.port);
+        channel.connect(remoteAddress);
+
+        executor.submit(new DatagramSender(opt.input, channel, remoteAddress));
+        return executor.submit(new DatagramReceiver(channel, opt.output, null));
+    }
+
+    private Future<Long> listenTcp() throws Exception {
         ServerSocketChannel serverChannel = ServerSocketChannel.open();
         serverChannel.socket().bind(new InetSocketAddress(opt.port));
         serverChannel.configureBlocking(true);
         SocketChannel channel = serverChannel.accept();
         InetSocketAddress remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
         System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress().getHostAddress(), remoteAddress.getPort()));
-        transferStreams(channel);
+        return transferStreams(channel);
     }
 
-    private void transferStreams(final SocketChannel channel) throws IOException, ExecutionException, InterruptedException {
+    private Future<Long> connectTcp() throws Exception {
+        SocketChannel channel = SocketChannel.open();
+        channel.connect(new InetSocketAddress(opt.host, opt.port));
+        return transferStreams(channel);
+    }
+
+    private Future<Long> transferStreams(final SocketChannel channel) throws IOException, ExecutionException, InterruptedException {
         // Shutdown socket when this program is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
@@ -166,11 +150,6 @@ public class NetCat {
         });
 
         executor.submit(new StreamTransferer(opt.input, channel.socket().getOutputStream()));
-        Future<Long> future = executor.submit(new StreamTransferer(channel.socket().getInputStream(), opt.output));
-
-        // Wait till other side is terminated
-        long bytesReceived = future.get();
-        System.err.println("bytesReceived = " + bytesReceived);
-        System.exit(0);
+        return executor.submit(new StreamTransferer(channel.socket().getInputStream(), opt.output));
     }
 }
