@@ -158,7 +158,7 @@ public class NetCat {
             }
         });
 
-        executor.submit(new StreamTransferer(opt.input, channel.socket().getOutputStream()));
-        return executor.submit(new StreamTransferer(channel.socket().getInputStream(), opt.output));
+        executor.submit(new StreamSender(opt.input, channel));
+        return executor.submit(new StreamReceiver(channel, opt.output));
     }
 }

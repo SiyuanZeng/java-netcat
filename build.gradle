@@ -26,6 +26,7 @@ sourceSets {
 dependencies {
     compile 'args4j:args4j:2.0.29'
     testCompile 'junit:junit:4.11'
+    testCompile 'org.jooq:jool:0.9.7'
 }
 
 mainClassName = 'com.github.dddpaul.netcat.NetCat'
