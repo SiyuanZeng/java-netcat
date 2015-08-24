@@ -1,20 +1,21 @@
 package com.github.dddpaul.netcat;
 
-import java.io.*;
+import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.Channels;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.Callable;
 
 import static com.github.dddpaul.netcat.NetCat.BUFFER_LIMIT;
 
-public class StreamSender implements Callable<Long> {
-    private ReadableByteChannel input;
-    private SocketChannel output;
+public class StreamTransferer implements Callable<Long> {
 
-    public StreamSender(InputStream input, SocketChannel output) {
-        this.input = Channels.newChannel(input);
+    private ReadableByteChannel input;
+    private WritableByteChannel output;
+
+    public StreamTransferer(ReadableByteChannel input, WritableByteChannel output) {
+        this.input = input;
         this.output = output;
     }
 
@@ -32,7 +33,9 @@ public class StreamSender implements Callable<Long> {
                     buf.clear();
                 }
             }
-            output.shutdownOutput();
+            if (output instanceof SocketChannel) {
+                ((SocketChannel) output).shutdownOutput();
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }

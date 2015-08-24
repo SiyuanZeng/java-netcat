@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.Channels;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -146,19 +147,19 @@ public class NetCat {
     /**
      * @return Receiver future
      */
-    private Future<Long> transferStreams(final SocketChannel channel) throws IOException, ExecutionException, InterruptedException {
+    private Future<Long> transferStreams(final SocketChannel socketChannel) throws IOException, ExecutionException, InterruptedException {
         // Shutdown socket when this program is terminated
         Runtime.getRuntime().addShutdownHook(new Thread() {
             public void run() {
                 try {
-                    channel.shutdownOutput();
+                    socketChannel.shutdownOutput();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         });
 
-        executor.submit(new StreamSender(opt.input, channel));
-        return executor.submit(new StreamReceiver(channel, opt.output));
+        executor.submit(new StreamTransferer(Channels.newChannel(opt.input), socketChannel));
+        return executor.submit(new StreamTransferer(socketChannel, Channels.newChannel(opt.output)));
     }
 }
