@@ -29,11 +29,13 @@ public class DatagramReceiver implements Callable<Long> {
         long total = 0;
         ByteBuffer buf = ByteBuffer.allocateDirect(BUFFER_LIMIT);
         try {
-            InetSocketAddress remoteAddress = (InetSocketAddress) input.receive(buf);
-            total = write(buf);
-            System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress(), remoteAddress.getPort()));
-            input.connect(remoteAddress);
-            queue.put(remoteAddress);
+            if (queue != null) {
+                InetSocketAddress remoteAddress = (InetSocketAddress) input.receive(buf);
+                total = write(buf);
+                System.err.println(String.format("Accepted from [%s:%d]", remoteAddress.getAddress(), remoteAddress.getPort()));
+                input.connect(remoteAddress);
+                queue.put(remoteAddress);
+            }
             while ((input.read(buf)) != -1) {
                 total += write(buf);
             }

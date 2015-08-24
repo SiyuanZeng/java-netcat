@@ -13,13 +13,19 @@ sourceSets {
     main {
         java {
             srcDir 'src'
+
+        }
+    }
+    test {
+        java {
+            srcDir 'test'
         }
     }
 }
 
 dependencies {
     compile 'args4j:args4j:2.0.29'
-    testCompile 'junit::junit:4.11'
+    testCompile 'junit:junit:4.11'
 }
 
 mainClassName = 'com.github.dddpaul.netcat.NetCat'
