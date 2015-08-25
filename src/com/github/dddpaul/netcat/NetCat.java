@@ -21,13 +21,13 @@ public class NetCat {
     // Ready to handle full-size UDP datagram or TCP segment in one step
     public static int BUFFER_LIMIT = 2 << 16 - 1;
 
-    private ExecutorService executor;
+    private ExecutorCompletionService<Long> executor;
 
     private Options opt;
 
     public NetCat(Options opt) {
         this.opt = opt;
-        executor = Executors.newFixedThreadPool(2);
+        executor = new ExecutorCompletionService<>(Executors.newFixedThreadPool(2));
     }
 
     public static class Options {
@@ -72,9 +72,9 @@ public class NetCat {
 
         Future<Long> future = new NetCat(opt).start();
 
-        // Wait till other side is terminated
-        long bytesReceived = future.get();
-        System.err.println("bytesReceived = " + bytesReceived);
+        // Wait till one of the sides is terminated
+        long bytes = future.get();
+        System.err.println("Bytes sent or received = " + bytes);
         System.exit(0);
     }
 
@@ -160,6 +160,8 @@ public class NetCat {
         });
 
         executor.submit(new StreamTransferer(Channels.newChannel(opt.input), socketChannel));
-        return executor.submit(new StreamTransferer(socketChannel, Channels.newChannel(opt.output)));
+        executor.submit(new StreamTransferer(socketChannel, Channels.newChannel(opt.output)));
+        executor.take().get();  // Wait for sender
+        return executor.take(); // And return receiver future
     }
 }
