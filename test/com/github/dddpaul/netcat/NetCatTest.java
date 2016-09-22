@@ -1,7 +1,5 @@
-package com.github.dddpaul.net;
+package com.github.dddpaul.netcat;
 
-import com.github.dddpaul.netcat.NetCat;
-import org.jooq.lambda.Unchecked;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,7 +37,7 @@ public class NetCatTest extends Assert {
     @Test
     public void testUdp() throws Exception {
         listener = new NetCat(new NetCat.Options(true, true, HOST, PORT, input1, output1));
-        new Thread(Unchecked.runnable(listener::start)).start();
+        Executors.newSingleThreadExecutor().submit(listener::start);
         Thread.sleep(100);
 
         connector = new NetCat(new NetCat.Options(false, true, HOST, PORT, input2, output2));
